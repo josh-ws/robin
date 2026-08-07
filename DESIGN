@@ -1,0 +1,77 @@
+== ROBIN ==
+
+Small desk calculator, inspired by Ivy.
+Rust.
+
+Rules:
+1. No operator precedence, right-associative ops.
+2. Results are exact until an irrational op.
+3. Whitespace non-significant.
+
+Syntax:
+Unary (abs x) and binary (pow x y), binary infix (x pow y)
+Sugar wrappers: mul x y == x * y
+No precedence. 2*3+4 = 14, not 10
+Brackets to override. (2*3)+4 = 10
+
+Numeric tower:
+Int         i64
+BigInt
+BigRat      stored reduced
+BigFloat    inexact. sqrt, log, exp, etc.
+
+Promotion:
+Every binary op (a op b) lifts a and b to max(a, b) for the computation,
+the result takes the form it needs, and then may be demoted.
+(3.5 mul 2) -> (3.5 mul 2.0) -> 7.0
+(1 div 3)   -> 1r3
+(4 div 2)   -> 2r1 -> 2
+
+Demotion:
+BigInt -> Int       OK, iff it fits
+BigRat -> BigInt    OK, iff denom == 1      3r1 == 3
+BigFloat -> *       NO
+
+Equality:
+Promotion only. 1 == 1.0 == 1r1
+No boolean type just 0/1
+
+Exactness:
+BigFloat is a one-way operation.
+Can only be produced with
+    sqrt, log, exp
+    trig + hyperbolic + inverse fns
+    pow with non-integer exponent
+    pi, euler
+    float (conversion op)
+    promotion
+Exact is tried first. sqrt 4 -> 2.0 -> 2.
+Decimal literals are exact. 1.234 = 1234r1000
+2e5 == 200000
+1e-3 == 1r1000
+
+Literals:
+Self-delimiting.
+999         Base 10
+0x30        Base 16
+0b10101     Base 2
+2e5         exponent
+1.234       decimal
+1r3         rational (note: / is always division)
+1j2         reserved for future
+
+- is always an operator. Exception as part of an exponent: 1e-3
+
+Out of scope:
+Lists
+Matrix
+Complex
+
+To consider:
+What crate to use (num-bigint and co.) or dashu
+Variables
+User-defined ops
+Error model
+Last-result _
+Float printing
+Resource limiting
