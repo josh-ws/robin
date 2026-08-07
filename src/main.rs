@@ -1,5 +1,9 @@
 use std::io::{self, BufRead, Write};
 
+mod lex;
+
+use lex::lex;
+
 fn main() {
     let mut lines = io::stdin().lock().lines();
     loop {
@@ -15,5 +19,5 @@ fn main() {
 }
 
 fn handle_line(line: &str) {
-    println!("{}", line)
+    println!("{:?}", lex(&line))
 }
