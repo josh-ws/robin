@@ -1,73 +1,114 @@
-use std::{iter::Peekable, path::Display, str::Chars};
+use std::ops::Range;
 
-#[derive(Debug)]
-pub enum Op {
-    Add,
-    Sub,
-    Mul,
-    Div,
-}
-
-#[derive(Debug)]
-pub enum Token {
-    Num(String),
-    Identifier(String),
-    Op(Op),
+#[derive(Debug, PartialEq)]
+pub enum TokenType {
+    Num,
+    Identifier,
+    Plus,
+    Minus,
+    Star,
+    Slash,
     LParen,
     RParen,
+    Newline,
     Eof,
 }
 
-pub fn lex(src: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
-    let mut chars = src.chars().peekable();
-    while let Some(&c) = chars.peek() {
-        match c {
-            c if c.is_whitespace() => {
-                chars.next();
-            }
-            c if c.is_ascii_digit() => tokens.push(lex_number(&mut chars)),
-            c if c.is_ascii_alphabetic() || c == '_' => tokens.push(lex_identifier(&mut chars)),
-            '(' => tokens.push(consume(&mut chars, Token::LParen)),
-            ')' => tokens.push(consume(&mut chars, Token::RParen)),
-            '+' => tokens.push(consume(&mut chars, Token::Op(Op::Add))),
-            '-' => tokens.push(consume(&mut chars, Token::Op(Op::Sub))),
-            '*' => tokens.push(consume(&mut chars, Token::Op(Op::Mul))),
-            '/' => tokens.push(consume(&mut chars, Token::Op(Op::Div))),
-            _ => panic!("unexpected character {c}"),
+#[derive(Debug, PartialEq)]
+pub struct Token {
+    pub typ: TokenType,
+    pub span: Range<usize>,
+}
+
+impl Token {
+    fn new(typ: TokenType, span: Range<usize>) -> Self {
+        Self { typ, span }
+    }
+}
+
+pub struct Lexer<'a> {
+    src: &'a [u8],
+    curr: usize,
+}
+
+impl<'a> Lexer<'a> {
+    pub fn new(src: &'a str) -> Self {
+        Self {
+            src: src.as_bytes(),
+            curr: 0,
+        }
+    }
+
+    pub fn next_token(&mut self) -> Token {
+        // TODO(jw) fix panics
+        self.eat_spaces();
+
+        let start = self.curr;
+        let Some(b) = self.peek() else {
+            return Token::new(TokenType::Eof, start..start);
         };
+        let kind = match b {
+            b if b.is_ascii_alphabetic() || b == b'_' => self.eat_identifier(),
+            b if b.is_ascii_digit() => self.eat_number(),
+            b'*' => self.consume(TokenType::Star),
+            b'/' => self.consume(TokenType::Slash),
+            b'-' => self.consume(TokenType::Minus),
+            b'+' => self.consume(TokenType::Plus),
+            b'(' => self.consume(TokenType::LParen),
+            b')' => self.consume(TokenType::RParen),
+            b'\n' => self.consume(TokenType::Newline),
+            _ => panic!("bailing"),
+        };
+        debug_assert!(self.curr > start);
+        Token::new(kind, start..self.curr)
     }
-    tokens.push(Token::Eof);
-    tokens
-}
 
-fn consume(src: &mut Peekable<Chars>, result: Token) -> Token {
-    src.next();
-    result
-}
+    fn eat_identifier(&mut self) -> TokenType {
+        self.eat_while(|c| c.is_ascii_alphanumeric() || c == b'_');
+        TokenType::Identifier
+    }
 
-fn lex_identifier(src: &mut Peekable<Chars>) -> Token {
-    let mut s = String::new();
-    while let Some(&c) = src.peek() {
-        if c.is_ascii_alphanumeric() || c == '_' {
-            s.push(c);
-            src.next();
-        } else {
-            break;
+    fn eat_number(&mut self) -> TokenType {
+        self.eat_while(|c| c.is_ascii_digit());
+        TokenType::Num
+    }
+
+    fn eat_spaces(&mut self) {
+        self.eat_while(|c| c != b'\n' && c.is_ascii_whitespace());
+    }
+
+    fn eat_while(&mut self, pred: impl Fn(u8) -> bool) {
+        while let Some(b) = self.peek() {
+            if !pred(b) {
+                break;
+            }
+            self.bump();
         }
     }
-    Token::Identifier(s)
+
+    fn peek(&self) -> Option<u8> {
+        self.src.get(self.curr).copied()
+    }
+
+    fn bump(&mut self) {
+        self.curr += 1;
+    }
+
+    fn consume(&mut self, typ: TokenType) -> TokenType {
+        self.bump();
+        typ
+    }
 }
 
-fn lex_number(src: &mut Peekable<Chars>) -> Token {
-    let mut s = String::new();
-    while let Some(&c) = src.peek() {
-        if c.is_ascii_digit() {
-            s.push(c);
-            src.next();
-        } else {
-            break;
+pub fn lex(src: &str) -> Vec<Token> {
+    let mut lexer = Lexer::new(src);
+    let mut tokens = Vec::new();
+    loop {
+        let t = lexer.next_token();
+        let done = t.typ == TokenType::Eof;
+        tokens.push(t);
+        if done {
+            return tokens;
         }
     }
-    Token::Num(s)
 }
