@@ -5,12 +5,22 @@ Rust.
 
 Rules:
 1. No operator precedence, right-associative ops.
-2. Results are exact until an irrational op.
-3. Whitespace non-significant.
+2. Results are exact and use rational arithmetic, but some functions are irrational, which uses high-precision floats.
+3. Whitespace separates tokens; it has no other meaning.
+
+Whitespace:
+Tokens scanned by maximal munch.
+Whitespace is required between tokens that would merge:
+2e5     A number
+2 e5    A number + identifier `e5`
+1r3     A rational
+1 r3    A number + identifier `r3`
+Newlines end an expression.
+Adjacent operands with no operator are an error.
 
 Syntax:
-Unary (abs x) and binary (pow x y), binary infix (x pow y)
-Sugar wrappers: mul x y == x * y
+Unary (abs x) and infix binary ops (x pow y) only.
+Sugar wrappers: x mul y == x * y
 No precedence. 2*3+4 = 14, not 10
 Brackets to override. (2*3)+4 = 10
 
@@ -23,9 +33,10 @@ BigFloat    inexact. sqrt, log, exp, etc.
 Promotion:
 Every binary op (a op b) lifts a and b to max(a, b) for the computation,
 the result takes the form it needs, and then may be demoted.
-(3.5 mul 2) -> (3.5 mul 2.0) -> 7.0
+(3.5 mul 2) -> (7r2 mul 2r1) -> 7r1 -> 7
 (1 div 3)   -> 1r3
 (4 div 2)   -> 2r1 -> 2
+(2 mul pi)  -> (2.0 mul pi) -> 6.28...
 
 Demotion:
 BigInt -> Int       OK, iff it fits
@@ -45,10 +56,12 @@ Can only be produced with
     pi, euler
     float (conversion op)
     promotion
-Exact is tried first. sqrt 4 -> 2.0 -> 2.
-Decimal literals are exact. 1.234 = 1234r1000
+Exact is tried first. sqrt 4 -> 2.
+Decimal literals are exact. 1.234 = 1234r1000, reduced to 617r500
 2e5 == 200000
 1e-3 == 1r1000
+
+Floats use 256 bits of mantissa by default.
 
 Literals:
 Self-delimiting.
@@ -60,7 +73,14 @@ Self-delimiting.
 1r3         rational (note: / is always division)
 1j2         reserved for future
 
-- is always an operator. Exception as part of an exponent: 1e-3
+- can be negation and subtraction.
+
+Errors:
+No NaN, just errors.
+Explicitly errors:
+    sqrt of a negative (no complex)
+    log 0
+    0 pow 0
 
 Out of scope:
 Lists
@@ -75,3 +95,5 @@ Error model
 Last-result _
 Float printing
 Resource limiting
+Change the precision of floats
+Comments
