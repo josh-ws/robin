@@ -1,8 +1,19 @@
 use std::ops::Range;
 
 #[derive(Debug, PartialEq)]
+pub enum NumForm {
+    Normal,
+    Hex,
+    Binary,
+    Exponent,
+    Decimal,
+    Rational,
+    Complex,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum TokenType {
-    Num,
+    Num(NumForm),
     Identifier,
     Plus,
     Minus,
@@ -69,8 +80,23 @@ impl<'a> Lexer<'a> {
     }
 
     fn eat_number(&mut self) -> TokenType {
+        if self.peek().unwrap() == b'0' {
+            match self.peek_ahead(1) {
+                Some(b'x') => {
+                    self.skip(2);
+                    self.eat_while(|c| c.is_ascii_hexdigit());
+                    return TokenType::Num(NumForm::Hex);
+                }
+                Some(b'b') => {
+                    self.skip(2);
+                    self.eat_while(|c| c == b'0' || c == b'1');
+                    return TokenType::Num(NumForm::Binary);
+                }
+                _ => {}
+            }
+        }
         self.eat_while(|c| c.is_ascii_digit());
-        TokenType::Num
+        TokenType::Num(NumForm::Normal)
     }
 
     fn eat_spaces(&mut self) {
@@ -82,20 +108,24 @@ impl<'a> Lexer<'a> {
             if !pred(b) {
                 break;
             }
-            self.bump();
+            self.skip(1);
         }
     }
 
-    fn peek(&self) -> Option<u8> {
-        self.src.get(self.curr).copied()
+    fn peek_ahead(&self, by: usize) -> Option<u8> {
+        self.src.get(self.curr + by).copied()
     }
 
-    fn bump(&mut self) {
-        self.curr += 1;
+    fn peek(&self) -> Option<u8> {
+        self.peek_ahead(0)
+    }
+
+    fn skip(&mut self, by: usize) {
+        self.curr += by;
     }
 
     fn consume(&mut self, typ: TokenType) -> TokenType {
-        self.bump();
+        self.skip(1);
         typ
     }
 }
