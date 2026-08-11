@@ -84,12 +84,12 @@ impl<'a> Lexer<'a> {
             match self.peek_ahead(1) {
                 Some(b'x') => {
                     self.skip(2);
-                    self.eat_while(|c| c.is_ascii_hexdigit());
+                    self.eat_expect_while(|c| c.is_ascii_digit(), "expected a hex constant");
                     return TokenType::Num(NumForm::Hex);
                 }
                 Some(b'b') => {
                     self.skip(2);
-                    self.eat_while(|c| c == b'0' || c == b'1');
+                    self.eat_expect_while(|c| c == b'0' || c == b'1', "expected a binary constant");
                     return TokenType::Num(NumForm::Binary);
                 }
                 _ => {}
@@ -109,6 +109,14 @@ impl<'a> Lexer<'a> {
                 break;
             }
             self.skip(1);
+        }
+    }
+
+    fn eat_expect_while(&mut self, pred: impl Fn(u8) -> bool, msg: &str) {
+        let before = self.curr;
+        self.eat_while(pred);
+        if self.curr == before {
+            panic!("{msg}")
         }
     }
 
