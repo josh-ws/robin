@@ -5,8 +5,7 @@ pub enum NumForm {
     Normal,
     Hex,
     Binary,
-    Exponent,
-    Decimal,
+    Scaled, // Base-10 number with fractional part and/or an exponent 1.5e5/1e10
     Rational,
     Complex,
 }
@@ -84,7 +83,7 @@ impl<'a> Lexer<'a> {
             match self.peek_ahead(1) {
                 Some(b'x') => {
                     self.skip(2);
-                    self.eat_expect_while(|c| c.is_ascii_digit(), "expected a hex constant");
+                    self.eat_expect_while(|c| c.is_ascii_hexdigit(), "expected a hex constant");
                     return TokenType::Num(NumForm::Hex);
                 }
                 Some(b'b') => {
@@ -96,7 +95,32 @@ impl<'a> Lexer<'a> {
             }
         }
         self.eat_while(|c| c.is_ascii_digit());
-        TokenType::Num(NumForm::Normal)
+
+        if self.peek() == Some(b'r') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
+            self.skip(1);
+            self.eat_while(|c| c.is_ascii_digit());
+            return TokenType::Num(NumForm::Rational);
+        }
+
+        let mut form = NumForm::Normal;
+        if self.peek() == Some(b'.') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
+            self.skip(1);
+            self.eat_while(|c| c.is_ascii_digit());
+            form = NumForm::Scaled;
+        }
+        if self.peek() == Some(b'e') {
+            let digits = match self.peek_ahead(1) {
+                Some(b'+' | b'-') => 2,
+                _ => 1,
+            };
+            if self.peek_ahead(digits).is_some_and(|c| c.is_ascii_digit()) {
+                self.skip(digits);
+                self.eat_while(|c| c.is_ascii_digit());
+                form = NumForm::Scaled;
+            }
+        }
+
+        TokenType::Num(form)
     }
 
     fn eat_spaces(&mut self) {
