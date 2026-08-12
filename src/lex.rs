@@ -174,3 +174,70 @@ pub fn lex(src: &str) -> Vec<Token> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::lex::{TokenType::Num, *};
+
+    fn lex_no_eof(src: &str) -> Vec<Token> {
+        let mut result = lex(src);
+        result.pop();
+        result
+    }
+
+    #[test]
+    pub fn lex_base10_number() {
+        assert_eq!(
+            lex_no_eof("123"),
+            vec![Token::new(TokenType::Num(NumForm::Normal), 0..3)]
+        )
+    }
+
+    #[test]
+    pub fn lex_hex_number() {
+        assert_eq!(
+            lex_no_eof("0x123ABCdef"),
+            vec![Token::new(TokenType::Num(NumForm::Hex), 0..11)]
+        )
+    }
+
+    #[test]
+    pub fn lex_binary_number() {
+        assert_eq!(
+            lex_no_eof("0b01101"),
+            vec![Token::new(TokenType::Num(NumForm::Binary), 0..7)]
+        )
+    }
+
+    #[test]
+    pub fn lex_rational_number() {
+        assert_eq!(
+            lex_no_eof("34r10"),
+            vec![Token::new(TokenType::Num(NumForm::Rational), 0..5)]
+        )
+    }
+
+    #[test]
+    pub fn lex_decimal_number() {
+        assert_eq!(
+            lex_no_eof("1.234"),
+            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..5)]
+        )
+    }
+
+    #[test]
+    pub fn lex_exponent_number() {
+        assert_eq!(
+            lex_no_eof("5e10"),
+            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..4)]
+        )
+    }
+
+    #[test]
+    pub fn lex_decimal_exponent_number() {
+        assert_eq!(
+            lex_no_eof("1.4e5"),
+            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..5)]
+        )
+    }
+}
