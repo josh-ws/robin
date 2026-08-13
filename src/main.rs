@@ -12,12 +12,15 @@ fn main() {
 
         match lines.next() {
             Some(Ok(line)) => handle_line(&line),
-            Some(Err(e)) => panic!("input error"),
+            Some(Err(e)) => eprintln!("lex error: {e}"),
             None => break,
         }
     }
 }
 
 fn handle_line(line: &str) {
-    println!("{:?}", lex(&line))
+    match lex(line) {
+        Ok(line) => println!("{:?}", line),
+        Err(e) => eprintln!("critical error: {:?}", e.typ),
+    }
 }

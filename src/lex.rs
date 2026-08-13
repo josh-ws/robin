@@ -1,6 +1,25 @@
 use std::ops::Range;
 
 #[derive(Debug, PartialEq)]
+pub enum LexErrorType {
+    UnexpectedByte,
+    EmptyLiteral,
+    Loop,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LexError {
+    pub typ: LexErrorType,
+    pub span: Range<usize>,
+}
+
+impl LexError {
+    fn new(typ: LexErrorType, span: Range<usize>) -> Self {
+        Self { typ, span }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum NumForm {
     Normal,
     Hex,
@@ -49,17 +68,16 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
-        // TODO(jw) fix panics
+    pub fn next_token(&mut self) -> Result<Token, LexError> {
         self.eat_spaces();
 
         let start = self.curr;
         let Some(b) = self.peek() else {
-            return Token::new(TokenType::Eof, start..start);
+            return Ok(Token::new(TokenType::Eof, start..start));
         };
         let kind = match b {
             b if b.is_ascii_alphabetic() || b == b'_' => self.eat_identifier(),
-            b if b.is_ascii_digit() => self.eat_number(),
+            b if b.is_ascii_digit() => self.eat_number()?,
             b'*' => self.consume(TokenType::Star),
             b'/' => self.consume(TokenType::Slash),
             b'-' => self.consume(TokenType::Minus),
@@ -67,10 +85,15 @@ impl<'a> Lexer<'a> {
             b'(' => self.consume(TokenType::LParen),
             b')' => self.consume(TokenType::RParen),
             b'\n' => self.consume(TokenType::Newline),
-            _ => panic!("bailing"),
+            _ => {
+                return Err(LexError::new(LexErrorType::UnexpectedByte, start..start + 1));
+            }
         };
-        debug_assert!(self.curr > start);
-        Token::new(kind, start..self.curr)
+        if self.curr > start {
+            Ok(Token::new(kind, start..self.curr))
+        } else {
+            Err(LexError::new(LexErrorType::Loop, start..start + 1))
+        }
     }
 
     fn eat_identifier(&mut self) -> TokenType {
@@ -78,18 +101,18 @@ impl<'a> Lexer<'a> {
         TokenType::Identifier
     }
 
-    fn eat_number(&mut self) -> TokenType {
+    fn eat_number(&mut self) -> Result<TokenType, LexError> {
         if self.peek().unwrap() == b'0' {
             match self.peek_ahead(1) {
                 Some(b'x') => {
                     self.skip(2);
-                    self.eat_expect_while(|c| c.is_ascii_hexdigit(), "expected a hex constant");
-                    return TokenType::Num(NumForm::Hex);
+                    self.eat_expect_while(|c| c.is_ascii_hexdigit(), LexErrorType::EmptyLiteral)?;
+                    return Ok(TokenType::Num(NumForm::Hex));
                 }
                 Some(b'b') => {
                     self.skip(2);
-                    self.eat_expect_while(|c| c == b'0' || c == b'1', "expected a binary constant");
-                    return TokenType::Num(NumForm::Binary);
+                    self.eat_expect_while(|c| c == b'0' || c == b'1', LexErrorType::EmptyLiteral)?;
+                    return Ok(TokenType::Num(NumForm::Binary));
                 }
                 _ => {}
             }
@@ -99,7 +122,7 @@ impl<'a> Lexer<'a> {
         if self.peek() == Some(b'r') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
             self.skip(1);
             self.eat_while(|c| c.is_ascii_digit());
-            return TokenType::Num(NumForm::Rational);
+            return Ok(TokenType::Num(NumForm::Rational));
         }
 
         let mut form = NumForm::Normal;
@@ -120,7 +143,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        TokenType::Num(form)
+        Ok(TokenType::Num(form))
     }
 
     fn eat_spaces(&mut self) {
@@ -136,11 +159,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn eat_expect_while(&mut self, pred: impl Fn(u8) -> bool, msg: &str) {
+    fn eat_expect_while(&mut self, pred: impl Fn(u8) -> bool, e: LexErrorType) -> Result<(), LexError> {
         let before = self.curr;
         self.eat_while(pred);
-        if self.curr == before {
-            panic!("{msg}")
+        if self.curr > before {
+            Ok(())
+        } else {
+            Err(LexError::new(e, self.curr..self.curr + 1))
         }
     }
 
@@ -162,15 +187,15 @@ impl<'a> Lexer<'a> {
     }
 }
 
-pub fn lex(src: &str) -> Vec<Token> {
+pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
     let mut lexer = Lexer::new(src);
     let mut tokens = Vec::new();
     loop {
-        let t = lexer.next_token();
+        let t = lexer.next_token()?;
         let done = t.typ == TokenType::Eof;
         tokens.push(t);
         if done {
-            return tokens;
+            return Ok(tokens);
         }
     }
 }
@@ -180,7 +205,7 @@ mod tests {
     use crate::lex::{TokenType::Num, *};
 
     fn lex_no_eof(src: &str) -> Vec<Token> {
-        let mut result = lex(src);
+        let mut result = lex(src).unwrap();
         result.pop();
         result
     }
