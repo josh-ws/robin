@@ -5,6 +5,7 @@ pub enum LexErrorType {
     UnexpectedByte,
     EmptyLiteral,
     Loop,
+    Unsupported,
 }
 
 #[derive(Debug, PartialEq)]
@@ -102,17 +103,25 @@ impl<'a> Lexer<'a> {
     }
 
     fn eat_number(&mut self) -> Result<TokenType, LexError> {
+        let form = self.eat_number_form()?;
+        if self.peek() == Some(b'j') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
+            return Err(LexError::new(LexErrorType::Unsupported, self.curr..self.curr + 1));
+        }
+        Ok(TokenType::Num(form))
+    }
+
+    fn eat_number_form(&mut self) -> Result<NumForm, LexError> {
         if self.peek().unwrap() == b'0' {
             match self.peek_ahead(1) {
                 Some(b'x') => {
                     self.skip(2);
                     self.eat_expect_while(|c| c.is_ascii_hexdigit(), LexErrorType::EmptyLiteral)?;
-                    return Ok(TokenType::Num(NumForm::Hex));
+                    return Ok(NumForm::Hex);
                 }
                 Some(b'b') => {
                     self.skip(2);
                     self.eat_expect_while(|c| c == b'0' || c == b'1', LexErrorType::EmptyLiteral)?;
-                    return Ok(TokenType::Num(NumForm::Binary));
+                    return Ok(NumForm::Binary);
                 }
                 _ => {}
             }
@@ -122,7 +131,7 @@ impl<'a> Lexer<'a> {
         if self.peek() == Some(b'r') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
             self.skip(1);
             self.eat_while(|c| c.is_ascii_digit());
-            return Ok(TokenType::Num(NumForm::Rational));
+            return Ok(NumForm::Rational);
         }
 
         let mut form = NumForm::Normal;
@@ -143,7 +152,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(TokenType::Num(form))
+        Ok(form)
     }
 
     fn eat_spaces(&mut self) {
@@ -264,5 +273,13 @@ mod tests {
             lex_no_eof("1.4e5"),
             vec![Token::new(TokenType::Num(NumForm::Scaled), 0..5)]
         )
+    }
+
+    #[test]
+    pub fn lex_complex_returns_err() {
+        assert!(lex("1j2").is_err());
+        assert!(lex("1.5j2.0").is_err());
+        assert!(lex("1r3j2r5").is_err());
+        assert!(lex("1e5j2e10").is_err());
     }
 }
