@@ -220,66 +220,26 @@ mod tests {
     }
 
     #[test]
-    pub fn lex_base10_number() {
-        assert_eq!(
-            lex_no_eof("123"),
-            vec![Token::new(TokenType::Num(NumForm::Normal), 0..3)]
-        )
-    }
-
-    #[test]
-    pub fn lex_hex_number() {
-        assert_eq!(
-            lex_no_eof("0x123ABCdef"),
-            vec![Token::new(TokenType::Num(NumForm::Hex), 0..11)]
-        )
-    }
-
-    #[test]
-    pub fn lex_binary_number() {
-        assert_eq!(
-            lex_no_eof("0b01101"),
-            vec![Token::new(TokenType::Num(NumForm::Binary), 0..7)]
-        )
-    }
-
-    #[test]
-    pub fn lex_rational_number() {
-        assert_eq!(
-            lex_no_eof("34r10"),
-            vec![Token::new(TokenType::Num(NumForm::Rational), 0..5)]
-        )
-    }
-
-    #[test]
-    pub fn lex_decimal_number() {
-        assert_eq!(
-            lex_no_eof("1.234"),
-            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..5)]
-        )
-    }
-
-    #[test]
-    pub fn lex_exponent_number() {
-        assert_eq!(
-            lex_no_eof("5e10"),
-            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..4)]
-        )
-    }
-
-    #[test]
-    pub fn lex_decimal_exponent_number() {
-        assert_eq!(
-            lex_no_eof("1.4e5"),
-            vec![Token::new(TokenType::Num(NumForm::Scaled), 0..5)]
-        )
+    pub fn lex_numbers() {
+        let cases = [
+            ("1234567890", NumForm::Normal, 0..10),
+            ("0x123ABCdef", NumForm::Hex, 0..11),
+            ("0b01101", NumForm::Binary, 0..7),
+            ("34r10", NumForm::Rational, 0..5),
+            ("1.234", NumForm::Scaled, 0..5),
+            ("5e10", NumForm::Scaled, 0..4),
+            ("1.4e5", NumForm::Scaled, 0..5),
+        ];
+        for (src, form, span) in cases {
+            assert_eq!(lex_no_eof(src), vec![Token::new(Num(form), span)], "lexing {src:?}");
+        }
     }
 
     #[test]
     pub fn lex_complex_returns_err() {
-        assert!(lex("1j2").is_err());
-        assert!(lex("1.5j2.0").is_err());
-        assert!(lex("1r3j2r5").is_err());
-        assert!(lex("1e5j2e10").is_err());
+        let cases = ["1j2", "1.5j2.0", "1r3j2r5", "1e5j2e10"];
+        for src in cases {
+            assert!(lex(src).is_err(), "lexing {src:?}");
+        }
     }
 }
