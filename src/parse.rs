@@ -3,6 +3,29 @@ use std::ops::Range;
 use crate::lex::{LexError, Lexer, NumForm, Token, TokenType};
 
 #[derive(Debug)]
+pub enum OpType {
+    Plus,
+}
+
+#[derive(Debug)]
+pub enum OpParity {
+    Unary,
+    Binary,
+}
+
+#[derive(Debug)]
+pub struct Op {
+    typ: OpType,
+    parity: OpParity,
+}
+
+impl Op {
+    fn new(typ: OpType, parity: OpParity) -> Self {
+        Self { typ, parity }
+    }
+}
+
+#[derive(Debug)]
 pub enum Numeric {
     Int(i64),
 }
@@ -10,6 +33,7 @@ pub enum Numeric {
 #[derive(Debug)]
 pub enum ExprType {
     Number(Numeric),
+    Binary { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
 }
 
 #[derive(Debug)]
@@ -46,11 +70,29 @@ impl<'a> Parser<'a> {
         if self.token.typ == TokenType::Eof {
             return Ok(None);
         }
-        let expr = self.parse_operand()?;
+        let expr = self.parse_expr()?;
         match self.token.typ {
             TokenType::Newline | TokenType::Eof => Ok(Some(expr)),
             _ => unimplemented!(), // TODO(jw) parse error
         }
+    }
+
+    fn parse_expr(&mut self) -> Result<Expr, LexError> {
+        let lhs = self.parse_operand()?;
+        let Some(def) = self.lookup_op(&self.token) else {
+            return Ok(lhs);
+        };
+        self.bump()?;
+        let rhs = self.parse_expr()?;
+        let span = lhs.span.start..rhs.span.end;
+        Ok(Expr::new(
+            ExprType::Binary {
+                op: def,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            },
+            span,
+        ))
     }
 
     fn parse_operand(&mut self) -> Result<Expr, LexError> {
@@ -76,6 +118,13 @@ impl<'a> Parser<'a> {
             _ => unimplemented!(),
         };
         Ok(Expr::new(typ, tok.span))
+    }
+
+    fn lookup_op(&self, tok: &Token) -> Option<Op> {
+        match tok.typ {
+            TokenType::Plus => Some(Op::new(OpType::Plus, OpParity::Binary)),
+            _ => None,
+        }
     }
 
     fn bump(&mut self) -> Result<Token, LexError> {
