@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{fmt, ops::Range};
 
 use crate::lex::{LexError, Lexer, NumForm, Token, TokenType};
 
@@ -15,8 +15,8 @@ pub enum OpParity {
 
 #[derive(Debug)]
 pub struct Op {
-    typ: OpType,
-    parity: OpParity,
+    pub typ: OpType,
+    pub parity: OpParity,
 }
 
 impl Op {
@@ -25,9 +25,17 @@ impl Op {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Numeric {
     Int(i64),
+}
+
+impl fmt::Display for Numeric {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Numeric::Int(n) => write!(f, "{n}"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -38,8 +46,8 @@ pub enum ExprType {
 
 #[derive(Debug)]
 pub struct Expr {
-    typ: ExprType,
-    span: Range<usize>,
+    pub typ: ExprType,
+    pub span: Range<usize>,
 }
 
 impl Expr {

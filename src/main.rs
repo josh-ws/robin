@@ -1,11 +1,12 @@
 use std::io::{self, BufRead, Write};
 
+mod eval;
 mod lex;
 mod parse;
 
 use lex::lex;
 
-use crate::parse::Parser;
+use crate::{eval::eval, parse::Parser};
 
 fn main() {
     let mut lines = io::stdin().lock().lines();
@@ -25,7 +26,10 @@ fn handle_line(line: &str) {
     let mut parser = Parser::new(line);
     loop {
         match parser.next_expr() {
-            Ok(Some(expr)) => println!("{expr:?}"),
+            Ok(Some(expr)) => match eval(&expr) {
+                Ok(val) => println!("{val}"),
+                Err(e) => eprintln!("error: {e}"),
+            },
             Ok(None) => break,
             Err(e) => {
                 eprintln!("error: {e:?}");
