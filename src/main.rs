@@ -1,8 +1,11 @@
 use std::io::{self, BufRead, Write};
 
 mod lex;
+mod parse;
 
 use lex::lex;
+
+use crate::parse::Parser;
 
 fn main() {
     let mut lines = io::stdin().lock().lines();
@@ -19,8 +22,9 @@ fn main() {
 }
 
 fn handle_line(line: &str) {
-    match lex(line) {
-        Ok(line) => println!("{:?}", line),
-        Err(e) => eprintln!("critical error: {:?}", e.typ),
+    let mut parser = Parser::new(line);
+    loop {
+        let expr = parser.next_expr();
+        println!("{:?}", expr)
     }
 }
