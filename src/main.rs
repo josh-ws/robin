@@ -24,7 +24,13 @@ fn main() {
 fn handle_line(line: &str) {
     let mut parser = Parser::new(line);
     loop {
-        let expr = parser.next_expr();
-        println!("{:?}", expr)
+        match parser.next_expr() {
+            Ok(Some(expr)) => println!("{expr:?}"),
+            Ok(None) => break,
+            Err(e) => {
+                eprintln!("error: {e:?}");
+                break;
+            }
+        }
     }
 }

@@ -15,7 +15,7 @@ pub struct LexError {
 }
 
 impl LexError {
-    fn new(typ: LexErrorType, span: Range<usize>) -> Self {
+    pub fn new(typ: LexErrorType, span: Range<usize>) -> Self {
         Self { typ, span }
     }
 }
