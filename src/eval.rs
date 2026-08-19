@@ -1,30 +1,20 @@
-use crate::parse::{BinaryOp, Expr, ExprType, Numeric, UnaryOp};
+use crate::{
+    numeric::Numeric,
+    parse::{BinaryOp, Expr, ExprType, UnaryOp},
+};
 
 pub fn eval(expr: &Expr) -> Result<Numeric, String> {
     match &expr.typ {
-        ExprType::Number(n) => Ok(*n),
+        ExprType::Number(n) => Ok(n.clone()),
         ExprType::Binary { op, lhs, rhs } => {
             let (a, b) = (eval(lhs)?, eval(rhs)?);
             match op {
-                BinaryOp::Add => match (a, b) {
-                    (Numeric::Int(x), Numeric::Int(y)) => {
-                        x.checked_add(y).map(Numeric::Int).ok_or("Overflow".to_string())
-                    }
-                },
-                BinaryOp::Sub => match (a, b) {
-                    (Numeric::Int(x), Numeric::Int(y)) => {
-                        x.checked_sub(y).map(Numeric::Int).ok_or("Overflow".to_string())
-                    }
-                },
+                BinaryOp::Add => Ok(a.add(b)),
+                BinaryOp::Sub => Ok(a.sub(b)),
             }
         }
         ExprType::Unary { op, operand } => {
-            let x = eval(operand)?;
-            match op {
-                UnaryOp::Neg => match x {
-                    Numeric::Int(n) => n.checked_neg().map(Numeric::Int).ok_or("Overflow".to_string()),
-                },
-            }
+            unimplemented!();
         }
     }
 }

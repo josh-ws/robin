@@ -3,7 +3,12 @@ use std::{
     ops::Range,
 };
 
-use crate::lex::{LexError, Lexer, NumForm, Token, TokenType};
+use dashu::integer::IBig;
+
+use crate::{
+    lex::{LexError, Lexer, NumForm, Token, TokenType},
+    numeric::Numeric,
+};
 
 #[derive(Debug)]
 pub enum UnaryOp {
@@ -14,19 +19,6 @@ pub enum UnaryOp {
 pub enum BinaryOp {
     Add,
     Sub,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Numeric {
-    Int(i64),
-}
-
-impl fmt::Display for Numeric {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Numeric::Int(n) => write!(f, "{n}"),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -118,22 +110,19 @@ impl<'a> Parser<'a> {
         let tok = self.bump()?;
         let slice = &self.src[tok.span.start..tok.span.end];
         let typ = match tok.typ {
-            TokenType::Num(form) => match form {
-                NumForm::Normal | NumForm::Hex | NumForm::Binary => {
-                    let (radix, digits) = match form {
-                        NumForm::Normal => (10, slice),
-                        NumForm::Hex => (16, slice.trim_start_matches("0x")),
-                        NumForm::Binary => (2, slice.trim_start_matches("0b")),
-                        _ => unimplemented!(),
-                    };
-                    let val = match i64::from_str_radix(digits, radix) {
-                        Ok(n) => Numeric::Int(n),
-                        Err(_) => todo!("promotion"),
-                    };
-                    ExprType::Number(val)
-                }
-                _ => unimplemented!(),
-            },
+            TokenType::Num(form) => {
+                let (radix, digits) = match form {
+                    NumForm::Normal => (10, slice),
+                    NumForm::Hex => (16, &slice[2..]),
+                    NumForm::Binary => (2, &slice[2..]),
+                    NumForm::Scaled | NumForm::Rational | NumForm::Complex => unimplemented!(),
+                };
+                let val = match IBig::from_str_radix(digits, radix) {
+                    Ok(n) => Numeric::from_big(n),
+                    Err(_) => unimplemented!(),
+                };
+                ExprType::Number(val)
+            }
             _ => unimplemented!(),
         };
         Ok(Expr::new(typ, tok.span))

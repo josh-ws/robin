@@ -1,5 +1,6 @@
 mod eval;
 mod lex;
+mod numeric;
 mod parse;
 mod session;
 
