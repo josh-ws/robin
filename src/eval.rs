@@ -11,6 +11,8 @@ pub fn eval(expr: &Expr) -> Result<Numeric, String> {
             match op {
                 BinaryOp::Add => Ok(a.add(b)),
                 BinaryOp::Sub => Ok(a.sub(b)),
+                BinaryOp::Mul => Ok(a.mul(b)),
+                BinaryOp::Pow => Ok(a.pow(b)),
             }
         }
         ExprType::Unary { op, operand } => {

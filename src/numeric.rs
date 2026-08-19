@@ -48,11 +48,44 @@ impl Numeric {
 
     pub fn sub(self, rhs: Self) -> Self {
         match Self::promote(self, rhs) {
-            Rung::Int(x, y) => match x.checked_add(y) {
+            Rung::Int(x, y) => match x.checked_sub(y) {
                 Some(n) => Numeric::Int(n),
                 None => Numeric::from_big(IBig::from(x) - IBig::from(y)),
             },
             Rung::BigInt(x, y) => Numeric::from_big(x - y),
+        }
+    }
+
+    pub fn mul(self, rhs: Self) -> Self {
+        match Self::promote(self, rhs) {
+            Rung::Int(x, y) => match x.checked_mul(y) {
+                Some(n) => Numeric::Int(n),
+                None => Numeric::from_big(IBig::from(x) * IBig::from(y)),
+            },
+            Rung::BigInt(x, y) => Numeric::from_big(x * y),
+        }
+    }
+
+    pub fn pow(self, rhs: Self) -> Self {
+        let exp = match rhs {
+            Numeric::Int(e) => e,
+            _ => todo!("overflow on pow rhs, this should be capped"),
+        };
+        if exp < 0 {
+            todo!("negative exponent");
+        }
+        if exp == 0 && self.is_zero() {
+            todo!("0 pow 0, this should return an error")
+        }
+
+        let exp = exp as usize;
+        Numeric::from_big(self.clone().into_big().pow(exp)) // TODO(jw) PERF don't always promote to bigint; pointless.
+    }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            Numeric::Int(n) => *n == 0,
+            Numeric::BigInt(_) => false,
         }
     }
 }

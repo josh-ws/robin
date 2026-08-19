@@ -19,6 +19,8 @@ pub enum UnaryOp {
 pub enum BinaryOp {
     Add,
     Sub,
+    Mul,
+    Pow,
 }
 
 #[derive(Debug)]
@@ -139,6 +141,14 @@ impl<'a> Parser<'a> {
         match tok.typ {
             TokenType::Plus => Some(BinaryOp::Add),
             TokenType::Minus => Some(BinaryOp::Sub),
+            TokenType::Star => Some(BinaryOp::Mul),
+            TokenType::Identifier => match &self.src[tok.span.start..tok.span.end] {
+                "add" => Some(BinaryOp::Add),
+                "sub" => Some(BinaryOp::Sub),
+                "mul" => Some(BinaryOp::Mul),
+                "pow" => Some(BinaryOp::Pow),
+                _ => None,
+            },
             _ => None,
         }
     }
