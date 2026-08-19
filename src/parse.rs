@@ -5,6 +5,7 @@ use crate::lex::{LexError, Lexer, NumForm, Token, TokenType};
 #[derive(Debug)]
 pub enum OpType {
     Plus,
+    Sub,
 }
 
 #[derive(Debug)]
@@ -131,6 +132,7 @@ impl<'a> Parser<'a> {
     fn lookup_op(&self, tok: &Token) -> Option<Op> {
         match tok.typ {
             TokenType::Plus => Some(Op::new(OpType::Plus, OpParity::Binary)),
+            TokenType::Minus => Some(Op::new(OpType::Sub, OpParity::Binary)),
             _ => None,
         }
     }

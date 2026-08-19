@@ -11,6 +11,11 @@ pub fn eval(expr: &Expr) -> Result<Numeric, String> {
                         x.checked_add(y).map(Numeric::Int).ok_or("Overflow".to_string())
                     }
                 },
+                OpType::Sub => match (a, b) {
+                    (Numeric::Int(x), Numeric::Int(y)) => {
+                        x.checked_sub(y).map(Numeric::Int).ok_or("Overflow".to_string())
+                    }
+                },
             }
         }
     }
