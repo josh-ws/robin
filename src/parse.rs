@@ -1,29 +1,19 @@
-use std::{fmt, ops::Range};
+use std::{
+    fmt::{self, Binary},
+    ops::Range,
+};
 
 use crate::lex::{LexError, Lexer, NumForm, Token, TokenType};
 
 #[derive(Debug)]
-pub enum OpType {
-    Plus,
+pub enum UnaryOp {
+    Neg,
+}
+
+#[derive(Debug)]
+pub enum BinaryOp {
+    Add,
     Sub,
-}
-
-#[derive(Debug)]
-pub enum OpParity {
-    Unary,
-    Binary,
-}
-
-#[derive(Debug)]
-pub struct Op {
-    pub typ: OpType,
-    pub parity: OpParity,
-}
-
-impl Op {
-    fn new(typ: OpType, parity: OpParity) -> Self {
-        Self { typ, parity }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,7 +32,15 @@ impl fmt::Display for Numeric {
 #[derive(Debug)]
 pub enum ExprType {
     Number(Numeric),
-    Binary { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
+    Unary {
+        op: UnaryOp,
+        operand: Box<Expr>,
+    },
+    Binary {
+        op: BinaryOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
 }
 
 #[derive(Debug)]
@@ -87,8 +85,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr, LexError> {
+        if let Some(op) = self.lookup_unary(&self.token) {
+            let tok = self.bump()?;
+            let operand = self.parse_expr()?;
+            let span = tok.span.start..operand.span.end;
+            return Ok(Expr::new(
+                ExprType::Unary {
+                    op,
+                    operand: Box::new(operand),
+                },
+                span,
+            ));
+        }
         let lhs = self.parse_operand()?;
-        let Some(def) = self.lookup_op(&self.token) else {
+        let Some(def) = self.lookup_binary(&self.token) else {
             return Ok(lhs);
         };
         self.bump()?;
@@ -129,10 +139,17 @@ impl<'a> Parser<'a> {
         Ok(Expr::new(typ, tok.span))
     }
 
-    fn lookup_op(&self, tok: &Token) -> Option<Op> {
+    fn lookup_unary(&self, tok: &Token) -> Option<UnaryOp> {
         match tok.typ {
-            TokenType::Plus => Some(Op::new(OpType::Plus, OpParity::Binary)),
-            TokenType::Minus => Some(Op::new(OpType::Sub, OpParity::Binary)),
+            TokenType::Minus => Some(UnaryOp::Neg),
+            _ => None,
+        }
+    }
+
+    fn lookup_binary(&self, tok: &Token) -> Option<BinaryOp> {
+        match tok.typ {
+            TokenType::Plus => Some(BinaryOp::Add),
+            TokenType::Minus => Some(BinaryOp::Sub),
             _ => None,
         }
     }
