@@ -128,7 +128,7 @@ impl<'a> Lexer<'a> {
         }
         self.eat_while(|c| c.is_ascii_digit());
 
-        if self.peek() == Some(b'r') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
+        if self.peek() == Some(b'/') && self.peek_ahead(1).is_some_and(|c| c.is_ascii_digit()) {
             self.skip(1);
             self.eat_while(|c| c.is_ascii_digit());
             return Ok(NumForm::Rational);
@@ -211,7 +211,7 @@ mod tests {
             ("1234567890", NumForm::Normal, 0..10),
             ("0x123ABCdef", NumForm::Hex, 0..11),
             ("0b01101", NumForm::Binary, 0..7),
-            ("34r10", NumForm::Rational, 0..5),
+            ("34/10", NumForm::Rational, 0..5),
             ("1.234", NumForm::Scaled, 0..5),
             ("5e10", NumForm::Scaled, 0..4),
             ("1.4e5", NumForm::Scaled, 0..5),
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     pub fn lex_complex_returns_err() {
-        let cases = ["1j2", "1.5j2.0", "1r3j2r5", "1e5j2e10"];
+        let cases = ["1j2", "1.5j2.0", "1/3j2/5", "1e5j2e10"];
         for src in cases {
             assert!(lex_first(src).is_err(), "lexing {src:?}");
         }

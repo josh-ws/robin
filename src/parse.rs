@@ -1,9 +1,6 @@
-use std::{
-    fmt::{self, Binary},
-    ops::Range,
-};
+use std::{ops::Range, str::FromStr};
 
-use dashu::integer::IBig;
+use dashu::{base::ParseError as DashuParseError, integer::IBig, rational::RBig};
 
 use crate::{
     lex::{LexError, Lexer, NumForm, Token, TokenType},
@@ -49,6 +46,24 @@ impl Expr {
     }
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    Lex,
+    InvalidNumericFormat,
+}
+
+impl From<LexError> for ParseError {
+    fn from(_: LexError) -> Self {
+        ParseError::Lex
+    }
+}
+
+impl From<DashuParseError> for ParseError {
+    fn from(_: DashuParseError) -> Self {
+        ParseError::InvalidNumericFormat
+    }
+}
+
 pub struct Parser<'a> {
     src: &'a str,
     lexer: Lexer<'a>,
@@ -64,7 +79,7 @@ impl<'a> Parser<'a> {
 
     // TODO(jw) create wrapped error type
     // TODO(jw) fix obvious panics
-    pub fn next_expr(&mut self) -> Result<Option<Expr>, LexError> {
+    pub fn next_expr(&mut self) -> Result<Option<Expr>, ParseError> {
         while self.token.typ == TokenType::Newline {
             self.bump()?;
         }
@@ -78,7 +93,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, LexError> {
+    fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         if let Some(op) = self.lookup_unary(&self.token) {
             let tok = self.bump()?;
             let operand = self.parse_expr()?;
@@ -108,20 +123,24 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_operand(&mut self) -> Result<Expr, LexError> {
+    fn parse_operand(&mut self) -> Result<Expr, ParseError> {
         let tok = self.bump()?;
         let slice = &self.src[tok.span.start..tok.span.end];
         let typ = match tok.typ {
             TokenType::Num(form) => {
-                let (radix, digits) = match form {
-                    NumForm::Normal => (10, slice),
-                    NumForm::Hex => (16, &slice[2..]),
-                    NumForm::Binary => (2, &slice[2..]),
-                    NumForm::Scaled | NumForm::Rational | NumForm::Complex => unimplemented!(),
-                };
-                let val = match IBig::from_str_radix(digits, radix) {
-                    Ok(n) => Numeric::from_big(n),
-                    Err(_) => unimplemented!(),
+                let val = match form {
+                    NumForm::Normal => Numeric::from_big(IBig::from_str_radix(slice, 10)?),
+                    NumForm::Hex => Numeric::from_big(IBig::from_str_radix(&slice[2..], 16)?),
+                    NumForm::Binary => Numeric::from_big(IBig::from_str_radix(&slice[2..], 2)?),
+                    NumForm::Scaled => Numeric::from_rat(RBig::from_str_decimal(slice)?),
+                    NumForm::Rational => {
+                        let (_, den) = slice.split_once('/').unwrap(); // todo(jw) fix unreachable error
+                        if den.bytes().all(|b| b == b'0') {
+                            panic!("div by zero"); // todo(jw) fix
+                        }
+                        Numeric::from_rat(RBig::from_str(slice).unwrap()) // todo(jw) handle erorr
+                    }
+                    NumForm::Complex => unreachable!(),
                 };
                 ExprType::Number(val)
             }

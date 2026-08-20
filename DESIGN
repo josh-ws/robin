@@ -13,10 +13,15 @@ Tokens scanned by maximal munch.
 Whitespace is required between tokens that would merge:
 2e5     A number
 2 e5    A number + identifier `e5`
-1r3     A rational
-1 r3    A number + identifier `r3`
+1/3     A rational
+1 / 3   A number + division op
 Newlines end an expression.
 Adjacent operands with no operator are an error.
+A rational literal is one token, an atom, so spacing changes meaning
+where an op follows:
+1/2/3       == (1 div 2) div 3 == 1/6
+1 / 2 / 3   == 1 div (2 div 3) == 3/2
+Accepted: same tradeoff as 2e5 vs 2 e5.
 
 Syntax:
 Unary (abs x) and infix binary ops (x pow y) only.
@@ -33,18 +38,18 @@ BigFloat    inexact. sqrt, log, exp, etc.
 Promotion:
 Every binary op (a op b) lifts a and b to max(a, b) for the computation,
 the result takes the form it needs, and then may be demoted.
-(3.5 mul 2) -> (7r2 mul 2r1) -> 7r1 -> 7
-(1 div 3)   -> 1r3
-(4 div 2)   -> 2r1 -> 2
+(3.5 mul 2) -> (7/2 mul 2/1) -> 7/1 -> 7
+(1 div 3)   -> 1/3
+(4 div 2)   -> 2/1 -> 2
 (2 mul pi)  -> (2.0 mul pi) -> 6.28...
 
 Demotion:
 BigInt -> Int       OK, iff it fits
-BigRat -> BigInt    OK, iff denom == 1      3r1 == 3
+BigRat -> BigInt    OK, iff denom == 1      3/1 == 3
 BigFloat -> *       NO
 
 Equality:
-Promotion only. 1 == 1.0 == 1r1
+Promotion only. 1 == 1.0 == 1/1
 No boolean type just 0/1
 
 Exactness:
@@ -57,9 +62,9 @@ Can only be produced with
     float (conversion op)
     promotion
 Exact is tried first. sqrt 4 -> 2.
-Decimal literals are exact. 1.234 = 1234r1000, reduced to 617r500
+Decimal literals are exact. 1.234 = 1234/1000, reduced to 617/500
 2e5 == 200000
-1e-3 == 1r1000
+1e-3 == 1/1000
 
 Floats use 256 bits of mantissa by default.
 
@@ -70,8 +75,17 @@ Self-delimiting.
 0b10101     Base 2
 2e5         exponent
 1.234       decimal
-1r3         rational (note: / is always division)
+1/3         rational (int/int, no spaces)
 1j2         reserved for future
+
+Only int/int merges into a rational literal; a decimal or exponent
+numerator does not. 1.5/2 and 2e5/3 are division.
+
+Printing:
+Rationals print as n/d, reduced, sign on the numerator: -1/3.
+denom == 1 demotes, so integers print bare.
+Only int/int is ever printed, which is exactly what the literal
+form accepts, so output re-reads as the same value.
 
 - can be negation and subtraction.
 
@@ -81,6 +95,7 @@ Explicitly errors:
     sqrt of a negative (no complex)
     log 0
     0 pow 0
+    div by zero, including the literal 1/0
 
 Out of scope:
 Lists

@@ -1,17 +1,19 @@
 use std::{fmt, ops::Neg};
 
-use dashu::integer::IBig;
+use dashu::{integer::IBig, rational::RBig};
 
 #[derive(Debug, Clone)]
 pub enum Numeric {
     Int(i64),
     BigInt(IBig),
+    Rational(RBig),
 }
 
 #[derive(Debug)]
 pub enum Rung {
     Int(i64, i64),
     BigInt(IBig, IBig),
+    Rational(RBig, RBig),
 }
 
 impl Numeric {
@@ -26,12 +28,31 @@ impl Numeric {
         match self {
             Numeric::Int(n) => IBig::from(n),
             Numeric::BigInt(n) => n,
+            Numeric::Rational(_) => unreachable!("promote bug"),
+        }
+    }
+
+    pub fn from_rat(v: RBig) -> Self {
+        if v.denominator().is_one() {
+            Self::from_big(v.numerator().clone())
+        } else {
+            Numeric::Rational(v)
+        }
+    }
+
+    pub fn into_rat(self) -> RBig {
+        match self {
+            Numeric::Int(n) => RBig::from(n),
+            Numeric::BigInt(n) => RBig::from(n),
+            Numeric::Rational(n) => n,
         }
     }
 
     pub fn promote(a: Self, b: Self) -> Rung {
         match (a, b) {
             (Numeric::Int(x), Numeric::Int(y)) => Rung::Int(x, y),
+            (Numeric::Rational(x), y) => Rung::Rational(x, y.into_rat()),
+            (x, Numeric::Rational(y)) => Rung::Rational(x.into_rat(), y),
             (x, y) => Rung::BigInt(x.into_big(), y.into_big()),
         }
     }
@@ -43,6 +64,7 @@ impl Numeric {
                 None => Numeric::from_big(IBig::from(x) + IBig::from(y)),
             },
             Rung::BigInt(x, y) => Numeric::from_big(x + y),
+            Rung::Rational(x, y) => Numeric::from_rat(x + y),
         }
     }
 
@@ -53,6 +75,7 @@ impl Numeric {
                 None => Numeric::from_big(IBig::from(x) - IBig::from(y)),
             },
             Rung::BigInt(x, y) => Numeric::from_big(x - y),
+            Rung::Rational(x, y) => Numeric::from_rat(x - y),
         }
     }
 
@@ -63,6 +86,7 @@ impl Numeric {
                 None => Numeric::from_big(IBig::from(x) * IBig::from(y)),
             },
             Rung::BigInt(x, y) => Numeric::from_big(x * y),
+            Rung::Rational(x, y) => Numeric::from_rat(x * y),
         }
     }
 
@@ -89,6 +113,7 @@ impl Numeric {
                 None => Numeric::from_big(IBig::from(x).neg()),
             },
             Numeric::BigInt(x) => Numeric::BigInt(x.neg()),
+            Numeric::Rational(x) => Numeric::Rational(x.neg()),
         }
     }
 
@@ -96,6 +121,7 @@ impl Numeric {
         match self {
             Numeric::Int(n) => *n == 0,
             Numeric::BigInt(_) => false,
+            Numeric::Rational(n) => n.numerator().is_zero(),
         }
     }
 }
@@ -105,6 +131,7 @@ impl fmt::Display for Numeric {
         match self {
             Numeric::Int(n) => write!(f, "{n}"),
             Numeric::BigInt(n) => write!(f, "{n}"),
+            Numeric::Rational(n) => write!(f, "{n}"),
         }
     }
 }
