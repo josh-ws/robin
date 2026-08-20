@@ -133,6 +133,10 @@ impl<'a> Parser<'a> {
     fn lookup_unary(&self, tok: &Token) -> Option<UnaryOp> {
         match tok.typ {
             TokenType::Minus => Some(UnaryOp::Neg),
+            TokenType::Identifier => match &self.src[tok.span.start..tok.span.end] {
+                "neg" => Some(UnaryOp::Neg),
+                _ => None,
+            },
             _ => None,
         }
     }

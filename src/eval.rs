@@ -16,7 +16,10 @@ pub fn eval(expr: &Expr) -> Result<Numeric, String> {
             }
         }
         ExprType::Unary { op, operand } => {
-            unimplemented!();
+            let a = eval(operand)?;
+            match op {
+                UnaryOp::Neg => Ok(a.neg()),
+            }
         }
     }
 }

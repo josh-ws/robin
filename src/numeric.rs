@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::Neg};
 
 use dashu::integer::IBig;
 
@@ -80,6 +80,16 @@ impl Numeric {
 
         let exp = exp as usize;
         Numeric::from_big(self.clone().into_big().pow(exp)) // TODO(jw) PERF don't always promote to bigint; pointless.
+    }
+
+    pub fn neg(self) -> Self {
+        match self {
+            Numeric::Int(x) => match x.checked_neg() {
+                Some(result) => Numeric::Int(result),
+                None => Numeric::from_big(IBig::from(x).neg()),
+            },
+            Numeric::BigInt(x) => Numeric::BigInt(x.neg()),
+        }
     }
 
     fn is_zero(&self) -> bool {

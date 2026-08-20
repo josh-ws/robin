@@ -196,27 +196,13 @@ impl<'a> Lexer<'a> {
     }
 }
 
-pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
-    let mut lexer = Lexer::new(src);
-    let mut tokens = Vec::new();
-    loop {
-        let t = lexer.next_token()?;
-        let done = t.typ == TokenType::Eof;
-        tokens.push(t);
-        if done {
-            return Ok(tokens);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::lex::{TokenType::Num, *};
 
-    fn lex_no_eof(src: &str) -> Vec<Token> {
-        let mut result = lex(src).unwrap();
-        result.pop();
-        result
+    fn lex_first(src: &str) -> Result<Token, LexError> {
+        let mut lexer = Lexer::new(src);
+        lexer.next_token()
     }
 
     #[test]
@@ -231,7 +217,7 @@ mod tests {
             ("1.4e5", NumForm::Scaled, 0..5),
         ];
         for (src, form, span) in cases {
-            assert_eq!(lex_no_eof(src), vec![Token::new(Num(form), span)], "lexing {src:?}");
+            assert_eq!(lex_first(src).unwrap(), Token::new(Num(form), span), "lexing {src:?}");
         }
     }
 
@@ -239,7 +225,7 @@ mod tests {
     pub fn lex_complex_returns_err() {
         let cases = ["1j2", "1.5j2.0", "1r3j2r5", "1e5j2e10"];
         for src in cases {
-            assert!(lex(src).is_err(), "lexing {src:?}");
+            assert!(lex_first(src).is_err(), "lexing {src:?}");
         }
     }
 }
