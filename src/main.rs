@@ -1,3 +1,4 @@
+mod error;
 mod eval;
 mod lex;
 mod numeric;

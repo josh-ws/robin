@@ -98,6 +98,9 @@ impl Numeric {
         if exp < 0 {
             todo!("negative exponent");
         }
+        if exp > 1000000 {
+            todo!("exponent far too large");
+        }
         if exp == 0 && self.is_zero() {
             todo!("0 pow 0, this should return an error")
         }

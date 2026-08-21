@@ -1,18 +1,19 @@
-use std::{ops::Range, str::FromStr};
+use std::str::FromStr;
 
-use dashu::{base::ParseError as DashuParseError, integer::IBig, rational::RBig};
+use dashu::{integer::IBig, rational::RBig};
 
 use crate::{
-    lex::{LexError, Lexer, NumForm, Token, TokenType},
+    error::{Error, ErrorKind, Span},
+    lex::{Lexer, NumForm, Token, TokenType},
     numeric::Numeric,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Neg,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -20,7 +21,7 @@ pub enum BinaryOp {
     Pow,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprType {
     Number(Numeric),
     Unary {
@@ -34,33 +35,15 @@ pub enum ExprType {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     pub typ: ExprType,
-    pub span: Range<usize>,
+    pub span: Span,
 }
 
 impl Expr {
-    fn new(typ: ExprType, span: Range<usize>) -> Self {
+    fn new(typ: ExprType, span: Span) -> Self {
         Self { typ, span }
-    }
-}
-
-#[derive(Debug)]
-pub enum ParseError {
-    Lex,
-    InvalidNumericFormat,
-}
-
-impl From<LexError> for ParseError {
-    fn from(_: LexError) -> Self {
-        ParseError::Lex
-    }
-}
-
-impl From<DashuParseError> for ParseError {
-    fn from(_: DashuParseError) -> Self {
-        ParseError::InvalidNumericFormat
     }
 }
 
@@ -71,15 +54,13 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(src: &'a str) -> Self {
+    pub fn new(src: &'a str) -> Result<Self, Error> {
         let mut lexer = Lexer::new(src);
-        let token = lexer.next_token().expect("failed to read a token from lexer"); // TODO(jw) remove panic
-        Self { src, lexer, token }
+        let token = lexer.next_token()?;
+        Ok(Self { src, lexer, token })
     }
 
-    // TODO(jw) create wrapped error type
-    // TODO(jw) fix obvious panics
-    pub fn next_expr(&mut self) -> Result<Option<Expr>, ParseError> {
+    pub fn next_expr(&mut self) -> Result<Option<Expr>, Error> {
         while self.token.typ == TokenType::Newline {
             self.bump()?;
         }
@@ -89,15 +70,19 @@ impl<'a> Parser<'a> {
         let expr = self.parse_expr()?;
         match self.token.typ {
             TokenType::Newline | TokenType::Eof => Ok(Some(expr)),
-            _ => unimplemented!(), // TODO(jw) parse error
+            _ => Err(Error::new(
+                ErrorKind::TrailingInput,
+                self.token.span.from,
+                self.token.span.to,
+            )),
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_expr(&mut self) -> Result<Expr, Error> {
         if let Some(op) = self.lookup_unary(&self.token) {
             let tok = self.bump()?;
             let operand = self.parse_expr()?;
-            let span = tok.span.start..operand.span.end;
+            let span = Span::merge(tok.span, operand.span);
             return Ok(Expr::new(
                 ExprType::Unary {
                     op,
@@ -112,7 +97,7 @@ impl<'a> Parser<'a> {
         };
         self.bump()?;
         let rhs = self.parse_expr()?;
-        let span = lhs.span.start..rhs.span.end;
+        let span = Span::merge(lhs.span, rhs.span);
         Ok(Expr::new(
             ExprType::Binary {
                 op: def,
@@ -123,28 +108,34 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_operand(&mut self) -> Result<Expr, ParseError> {
+    fn parse_operand(&mut self) -> Result<Expr, Error> {
         let tok = self.bump()?;
-        let slice = &self.src[tok.span.start..tok.span.end];
+        let span = tok.span;
+        let slice = &self.src[span.from..span.to];
+        let bad_num = |_| Error::new(ErrorKind::InvalidNumberFormat, span.from, span.to);
         let typ = match tok.typ {
             TokenType::Num(form) => {
                 let val = match form {
-                    NumForm::Normal => Numeric::from_big(IBig::from_str_radix(slice, 10)?),
-                    NumForm::Hex => Numeric::from_big(IBig::from_str_radix(&slice[2..], 16)?),
-                    NumForm::Binary => Numeric::from_big(IBig::from_str_radix(&slice[2..], 2)?),
-                    NumForm::Scaled => Numeric::from_rat(RBig::from_str_decimal(slice)?),
+                    NumForm::Normal => Numeric::from_big(IBig::from_str_radix(slice, 10).map_err(bad_num)?),
+                    NumForm::Hex => Numeric::from_big(IBig::from_str_radix(&slice[2..], 16).map_err(bad_num)?),
+                    NumForm::Binary => Numeric::from_big(IBig::from_str_radix(&slice[2..], 2).map_err(bad_num)?),
+                    NumForm::Scaled => Numeric::from_rat(RBig::from_str_decimal(slice).map_err(bad_num)?),
                     NumForm::Rational => {
-                        let (_, den) = slice.split_once('/').unwrap(); // todo(jw) fix unreachable error
+                        let (_, den) = slice.split_once('/').expect("parse bug splitting '/', please report");
                         if den.bytes().all(|b| b == b'0') {
-                            panic!("div by zero"); // todo(jw) fix
+                            return Err(Error::new(ErrorKind::DivisionByZero, span.from, span.to));
                         }
-                        Numeric::from_rat(RBig::from_str(slice).unwrap()) // todo(jw) handle erorr
+                        Numeric::from_rat(RBig::from_str(slice).map_err(bad_num)?)
                     }
-                    NumForm::Complex => unreachable!(),
                 };
                 ExprType::Number(val)
             }
-            _ => unimplemented!(),
+            TokenType::Eof => {
+                return Err(Error::new(ErrorKind::UnexpectedEof, span.from, span.to));
+            }
+            _ => {
+                return Err(Error::new(ErrorKind::ExpectedOperand, span.from, span.to));
+            }
         };
         Ok(Expr::new(typ, tok.span))
     }
@@ -152,7 +143,7 @@ impl<'a> Parser<'a> {
     fn lookup_unary(&self, tok: &Token) -> Option<UnaryOp> {
         match tok.typ {
             TokenType::Minus => Some(UnaryOp::Neg),
-            TokenType::Identifier => match &self.src[tok.span.start..tok.span.end] {
+            TokenType::Identifier => match self.slice(tok.span) {
                 "neg" => Some(UnaryOp::Neg),
                 _ => None,
             },
@@ -165,7 +156,7 @@ impl<'a> Parser<'a> {
             TokenType::Plus => Some(BinaryOp::Add),
             TokenType::Minus => Some(BinaryOp::Sub),
             TokenType::Star => Some(BinaryOp::Mul),
-            TokenType::Identifier => match &self.src[tok.span.start..tok.span.end] {
+            TokenType::Identifier => match self.slice(tok.span) {
                 "add" => Some(BinaryOp::Add),
                 "sub" => Some(BinaryOp::Sub),
                 "mul" => Some(BinaryOp::Mul),
@@ -176,7 +167,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn bump(&mut self) -> Result<Token, LexError> {
+    fn slice(&self, span: Span) -> &'a str {
+        &self.src[span.from..span.to]
+    }
+
+    fn bump(&mut self) -> Result<Token, Error> {
         let next = self.lexer.next_token()?;
         Ok(std::mem::replace(&mut self.token, next))
     }
