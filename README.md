@@ -1,8 +1,22 @@
-Lightweight desk calculator with arbitrary precision support and decent error diagnostics.
+# Robin
+
+Lightweight desk calculator with arbitrary-precision arithmetic.
 
 Inspired by Ivy and APL. 
 
 Operator precedence is right-to-left. `2*3+4` is `14`, not `10`.
+
+## Features 
+
+- Arbitrary-precision arithmetic 
+- Rational numbers `1/3`
+- Exponents in scientific notation `1e10`
+- Hexadecimal and binary support `0x10`/`0b10101`
+- Decent error diagnostics
+
+A lot of things still unimplemented. See DESIGN.
+
+## Sample
 
 ```
 $ robin
